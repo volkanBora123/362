@@ -63,6 +63,10 @@ function improved_compress()
     % Write header information
     fwrite(fid, num_frames, 'uint32');
     fwrite(fid, GOP_SIZE, 'uint32');
+    frame = double(imread(fullfile(video_dir, frame_files(1).name)));
+    [height, width, ~] = size(frame);
+    fwrite(fid, height, 'uint32');
+    fwrite(fid, width, 'uint32');
     fwrite(fid, BLOCK_SIZE, 'uint32');
     fwrite(fid, length(bitstream), 'uint32');
     
@@ -76,62 +80,63 @@ end
 
 function gop_bitstream = encode_gop_with_b_frames(start_frame, end_frame, ...
     frame_files, video_dir, Q_LUMA, Q_CHROMA, BLOCK_SIZE)
-    
+
     gop_size = end_frame - start_frame + 1;
     gop_bitstream = [];
-    
+
     % Load all frames in GOP
     frames = cell(gop_size, 1);
     for i = 1:gop_size
         frame_path = fullfile(video_dir, frame_files(start_frame + i - 1).name);
         frames{i} = double(imread(frame_path));
     end
-    
-    % Encode I-frame (first frame)
-    fprintf('  Encoding I-frame %d\n', start_frame);
-    [i_data, i_reconstructed] = encode_i_frame(frames{1}, Q_LUMA, Q_CHROMA, BLOCK_SIZE);
-    
-    % Add frame type marker and data
-    gop_bitstream = [gop_bitstream uint8('I') serialize_frame_data(i_data)];
-    
-    % Store reconstructed I-frame for prediction
-    reconstructed_frames = cell(gop_size, 1);
-    reconstructed_frames{1} = i_reconstructed;
-    
-    % Define GOP pattern: I-B-B-P-B-B-P-...
+
     frame_types = determine_frame_types(gop_size);
-    
-    % First pass: encode P-frames (anchor frames for B-frames)
-    for i = 2:gop_size
-        if frame_types{i} == 'P'
+    reconstructed_frames = cell(gop_size, 1);
+    gop_frame_bitstreams = cell(gop_size, 1);  % Store encoded frames
+
+    % --- First pass: encode I and P frames only ---
+    for i = 1:gop_size
+        frame_type = frame_types{i};
+
+        if frame_type == 'I'
+            fprintf('  Encoding I-frame %d\n', start_frame + i - 1);
+            [data, recon] = encode_i_frame(frames{i}, Q_LUMA, Q_CHROMA, BLOCK_SIZE);
+            reconstructed_frames{i} = recon;
+            gop_frame_bitstreams{i} = [uint8('I') serialize_frame_data(data)];
+
+        elseif frame_type == 'P'
             fprintf('  Encoding P-frame %d\n', start_frame + i - 1);
-            
-            % Find previous reconstructed reference
             ref_idx = find_previous_anchor(i, frame_types);
-            
-            [p_data, p_reconstructed] = encode_p_frame(frames{i}, ...
-                reconstructed_frames{ref_idx}, Q_LUMA, Q_CHROMA, BLOCK_SIZE);
-            
-            gop_bitstream = [gop_bitstream uint8('P') serialize_frame_data(p_data)];
-            reconstructed_frames{i} = p_reconstructed;
+            if isempty(reconstructed_frames{ref_idx})
+                error('Missing reference for P-frame %d (ref idx %d)', i, ref_idx);
+            end
+            [data, recon] = encode_p_frame(frames{i}, reconstructed_frames{ref_idx}, ...
+                Q_LUMA, Q_CHROMA, BLOCK_SIZE);
+            reconstructed_frames{i} = recon;
+            gop_frame_bitstreams{i} = [uint8('P') serialize_frame_data(data)];
         end
     end
-    
-    % Second pass: encode B-frames (need both forward and backward references)
-    for i = 2:gop_size
+
+    % --- Second pass: encode B-frames (after references exist) ---
+    for i = 1:gop_size
         if frame_types{i} == 'B'
             fprintf('  Encoding B-frame %d\n', start_frame + i - 1);
-            
-            % Find forward and backward references
-            [forward_idx, backward_idx] = find_b_frame_references(i, frame_types);
-            
-            [b_data, b_reconstructed] = encode_b_frame(frames{i}, ...
-                reconstructed_frames{forward_idx}, reconstructed_frames{backward_idx}, ...
+            [f_idx, b_idx] = find_b_frame_references(i, frame_types);
+            if isempty(reconstructed_frames{f_idx}) || isempty(reconstructed_frames{b_idx})
+                error('Missing reference(s) for B-frame %d (F: %d, B: %d)', i, f_idx, b_idx);
+            end
+            [data, recon] = encode_b_frame(frames{i}, ...
+                reconstructed_frames{f_idx}, reconstructed_frames{b_idx}, ...
                 Q_LUMA, Q_CHROMA, BLOCK_SIZE);
-            
-            gop_bitstream = [gop_bitstream uint8('B') serialize_frame_data(b_data)];
-            reconstructed_frames{i} = b_reconstructed;
+            reconstructed_frames{i} = recon;
+            gop_frame_bitstreams{i} = [uint8('B') serialize_frame_data(data)];
         end
+    end
+
+    % --- Concatenate all encoded frames in display order ---
+    for i = 1:gop_size
+        gop_bitstream = [gop_bitstream gop_frame_bitstreams{i}];
     end
 end
 
