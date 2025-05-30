@@ -2,7 +2,6 @@ function improved_decompress()
     % Improved Video Decompression for B-frames and Enhanced Quantization
     % Decodes GOP Structure: I-B-B-P-B-B-P-...
     
-    % Enhanced quantization matrices (must match compression)
     Q_LUMA = [16 11 10 16 24 40 51 61;
               12 12 14 19 26 58 60 55;
               14 13 16 24 40 57 69 56;
@@ -20,14 +19,12 @@ function improved_decompress()
                 99 99 99 99 99 99 99 99;
                 99 99 99 99 99 99 99 99;
                 99 99 99 99 99 99 99 99];
-    
-    % Read compressed file
+    %reading all info
     fid = fopen('result_improved.bin', 'rb');
     if fid == -1
         error('Cannot open compressed file: result_improved.bin');
     end
 
-    % Read header information
     num_frames = fread(fid, 1, 'uint32');
     GOP_SIZE = fread(fid, 1, 'uint32');
     height = fread(fid, 1, 'uint32');
@@ -39,7 +36,6 @@ function improved_decompress()
     fprintf('Frame dimensions: %dx%d, Block size: %d\n', width, height, BLOCK_SIZE);
     fprintf('Bitstream length: %d bytes\n', bitstream_length);
 
-    % Read bitstream
     bitstream = fread(fid, bitstream_length, 'uint8');
     fclose(fid);
 
@@ -48,13 +44,12 @@ function improved_decompress()
             bitstream_length, length(bitstream));
     end
     
-    % Create output directory
+    % Creating output directory
     output_dir = './decompressed_frames/';
     if ~exist(output_dir, 'dir')
         mkdir(output_dir);
     end
     
-    % Decompress frames
     frame_idx = 1;
     bitstream_pos = 1;
     
@@ -68,13 +63,11 @@ function improved_decompress()
             bitstream, bitstream_pos, gop_end - frame_idx + 1, ...
             Q_LUMA, Q_CHROMA, BLOCK_SIZE, height, width);
         
-        % Save decoded frames
+        % Saving the  decoded frames
         for i = 1:length(decoded_frames)
             if ~isempty(decoded_frames{i})
                 frame_filename = sprintf('frame_%04d.jpg', frame_idx + i - 1);
-                frame_path = fullfile(output_dir, frame_filename);
-                
-                % Convert to uint8 and save
+                frame_path = fullfile(output_dir, frame_filename);                
                 frame_uint8 = uint8(round(decoded_frames{i}));
                 imwrite(frame_uint8, frame_path);
             end
@@ -90,10 +83,10 @@ function [decoded_frames, new_pos] = decode_gop_with_b_frames(bitstream, pos, go
     decoded_frames = cell(gop_size, 1);
     frame_types = determine_frame_types(gop_size);
     decoded_flags = false(gop_size, 1);
-    b_frame_positions = zeros(gop_size, 1); % Store B-frame positions
+    b_frame_positions = zeros(gop_size, 1); 
     current_pos = pos;
 
-    % First pass: Decode I and P frames, store B-frame positions
+    % First pass-Decode I and P frames, store B-frame positions
     for i = 1:gop_size
         if current_pos > length(bitstream)
             error('Bitstream position %d exceeds bitstream length %d', ...
@@ -127,7 +120,7 @@ function [decoded_frames, new_pos] = decode_gop_with_b_frames(bitstream, pos, go
                     Q_LUMA, Q_CHROMA, BLOCK_SIZE, height, width);
                 decoded_flags(i) = true;
             end
-        else % B-frame
+        else 
             b_frame_positions(i) = current_pos - 1; % Store position of B-frame marker
             if current_pos + 3 > length(bitstream)
                 error('Not enough data to read B-frame length at position %d', current_pos);
@@ -137,7 +130,7 @@ function [decoded_frames, new_pos] = decode_gop_with_b_frames(bitstream, pos, go
         end
     end
 
-    % Second pass: Decode B-frames using stored positions
+    % Second pass-Decode B-frames using stored positions
     for i = 1:gop_size
         if strcmp(frame_types{i}, 'B')
             if b_frame_positions(i) == 0
@@ -175,11 +168,9 @@ end
 function frame_types = determine_frame_types(gop_size)
     % Recreate GOP pattern: I-B-B-P-B-B-P-...
     frame_types = cell(gop_size, 1);
-    frame_types{1} = 'I';  % First frame is always I
-    
-    % Pattern: every 3rd frame after I is P, others are B
+    frame_types{1} = 'I';  % First frame is always I    
     for i = 2:gop_size
-        if mod(i-1, 3) == 0  % Positions 4, 7, 10, ... are P-frames
+        if mod(i-1, 3) == 0  
             frame_types{i} = 'P';
         else
             frame_types{i} = 'B';
@@ -195,11 +186,10 @@ function ref_idx = find_previous_anchor(frame_idx, frame_types)
             return;
         end
     end
-    ref_idx = 1;  % Fallback to I-frame
+    ref_idx = 1;  
 end
 
 function [forward_idx, backward_idx] = find_b_frame_references(frame_idx, frame_types)
-    % Find forward reference (previous I or P frame)
     forward_idx = 1;
     for i = frame_idx-1:-1:1
         if strcmp(frame_types{i}, 'I') || strcmp(frame_types{i}, 'P')
@@ -208,8 +198,7 @@ function [forward_idx, backward_idx] = find_b_frame_references(frame_idx, frame_
         end
     end
     
-    % Find backward reference (next I or P frame)
-    backward_idx = forward_idx;  % Default to forward reference
+    backward_idx = forward_idx;  
     for i = frame_idx+1:length(frame_types)
         if strcmp(frame_types{i}, 'I') || strcmp(frame_types{i}, 'P')
             backward_idx = i;
@@ -219,7 +208,7 @@ function [forward_idx, backward_idx] = find_b_frame_references(frame_idx, frame_
 end
 
 function [frame, new_pos] = decode_i_frame(bitstream, pos, Q_LUMA, Q_CHROMA, BLOCK_SIZE, height, width)
-    % Check bounds before reading frame data length
+    % Checking bounds 
     if pos + 3 > length(bitstream)
         error('Not enough data to read frame length at position %d', pos);
     end
@@ -231,7 +220,7 @@ function [frame, new_pos] = decode_i_frame(bitstream, pos, Q_LUMA, Q_CHROMA, BLO
             data_length, length(bitstream) - pos + 1);
     end
 
-    channels = 3;  % Assuming RGB
+    channels = 3;  
     frame = zeros(height, width, channels);
     mb_height = ceil(height / BLOCK_SIZE);
     mb_width = ceil(width / BLOCK_SIZE);
@@ -368,7 +357,6 @@ end
 
 % Helper functions
 function block = inverse_zigzag_scan(zigzag_vector)
-    % Zigzag scan order for 8x8 block (same as compression)
     zigzag_order = [1 2 6 7 15 16 28 29;
                     3 5 8 14 17 27 30 43;
                     4 9 13 18 26 31 42 44;
@@ -400,32 +388,24 @@ function [rle_data, new_pos] = deserialize_rle(bitstream, pos)
     total_values = 0;
     
     while total_values < 64 && current_pos + 2 < length(bitstream)
-        % Check bounds
+        % Checking bounds
         if current_pos + 2 > length(bitstream)
             warning('Not enough data for complete RLE entry at position %d', current_pos);
             break;
         end
-        
-        % Read run length (1 byte)
         run_length = double(bitstream(current_pos));
         current_pos = current_pos + 1;
-
-        % Read value (2 bytes, signed)
         value_bytes = uint8(bitstream(current_pos:current_pos+1));
         value = double(typecast(value_bytes, 'int16'));
         current_pos = current_pos + 2;
 
         rle_data = [rle_data; run_length, value];
         total_values = total_values + run_length;
-        
-        % Safety check to prevent infinite loops
         if size(rle_data, 1) > 64
             warning('RLE data exceeds expected size, truncating');
             break;
         end
     end
-    
-    % Ensure we have exactly 64 values by padding if necessary
     if total_values < 64
         rle_data = [rle_data; 64 - total_values, 0];
     end

@@ -2,12 +2,12 @@ function improved_compress()
     % Improved Video Compression with B-frames and Enhanced Quantization
     % GOP Structure: I-B-B-P-B-B-P-... 
     
-    % Configuration parameters
+    % parameters which will be used.
     GOP_SIZE = 15;  % Total frames in GOP (adjustable)
     BLOCK_SIZE = 8;
     
     % Enhanced quantization matrices
-    % Standard JPEG quantization matrix (luminance)
+    % luminance matrix
     Q_LUMA = [16 11 10 16 24 40 51 61;
               12 12 14 19 26 58 60 55;
               14 13 16 24 40 57 69 56;
@@ -27,17 +27,13 @@ function improved_compress()
                 99 99 99 99 99 99 99 99;
                 99 99 99 99 99 99 99 99];
     
-    % Load video frames
     video_dir = './video_data/';
     frame_files = dir(fullfile(video_dir, '*.jpg'));
     num_frames = length(frame_files);
     
     fprintf('Processing %d frames with GOP size %d\n', num_frames, GOP_SIZE);
     
-    % Initialize output bitstream
     bitstream = [];
-    
-    % Process frames in GOP structure
     frame_idx = 1;
     
     while frame_idx <= num_frames
@@ -46,7 +42,7 @@ function improved_compress()
         
         fprintf('Processing GOP: frames %d to %d\n', frame_idx, gop_end);
         
-        % Encode GOP with I-B-B-P-B-B-P structure
+        % Encoding GOP here
         gop_bitstream = encode_gop_with_b_frames(frame_idx, gop_end, ...
             frame_files, video_dir, Q_LUMA, Q_CHROMA, BLOCK_SIZE);
         
@@ -54,13 +50,12 @@ function improved_compress()
         frame_idx = gop_end + 1;
     end
     
-    % Write header and bitstream to file
     fid = fopen('result_improved.bin', 'wb');
     if fid == -1
         error('Cannot create output file');
     end
     
-    % Write header information
+    % Header information writeen
     fwrite(fid, num_frames, 'uint32');
     fwrite(fid, GOP_SIZE, 'uint32');
     frame = double(imread(fullfile(video_dir, frame_files(1).name)));
@@ -70,7 +65,7 @@ function improved_compress()
     fwrite(fid, BLOCK_SIZE, 'uint32');
     fwrite(fid, length(bitstream), 'uint32');
     
-    % Write bitstream
+    %Bitstream written 
     fwrite(fid, bitstream, 'uint8');
     fclose(fid);
     
@@ -93,9 +88,9 @@ function gop_bitstream = encode_gop_with_b_frames(start_frame, end_frame, ...
 
     frame_types = determine_frame_types(gop_size);
     reconstructed_frames = cell(gop_size, 1);
-    gop_frame_bitstreams = cell(gop_size, 1);  % Store encoded frames
+    gop_frame_bitstreams = cell(gop_size, 1); 
 
-    % --- First pass: encode I and P frames only ---
+    % First pass: encoding only  I and P frames
     for i = 1:gop_size
         frame_type = frame_types{i};
 
@@ -118,7 +113,7 @@ function gop_bitstream = encode_gop_with_b_frames(start_frame, end_frame, ...
         end
     end
 
-    % --- Second pass: encode B-frames (after references exist) ---
+    % Second pass: encode B-frames 
     for i = 1:gop_size
         if frame_types{i} == 'B'
             fprintf('  Encoding B-frame %d\n', start_frame + i - 1);
@@ -134,20 +129,20 @@ function gop_bitstream = encode_gop_with_b_frames(start_frame, end_frame, ...
         end
     end
 
-    % --- Concatenate all encoded frames in display order ---
+    % Concatenation in display order
     for i = 1:gop_size
         gop_bitstream = [gop_bitstream gop_frame_bitstreams{i}];
     end
 end
 
 function frame_types = determine_frame_types(gop_size)
-    % Create GOP pattern: I-B-B-P-B-B-P-...
+    % Creating GOP pattern: I-B-B-P-B-B-P-...
     frame_types = cell(gop_size, 1);
-    frame_types{1} = 'I';  % First frame is always I
+    frame_types{1} = 'I';  
     
     % Pattern: every 3rd frame after I is P, others are B
     for i = 2:gop_size
-        if mod(i-1, 3) == 0  % Positions 4, 7, 10, ... are P-frames
+        if mod(i-1, 3) == 0  
             frame_types{i} = 'P';
         else
             frame_types{i} = 'B';
@@ -177,7 +172,7 @@ function [forward_idx, backward_idx] = find_b_frame_references(frame_idx, frame_
     end
     
     % Find backward reference (next I or P frame)
-    backward_idx = forward_idx;  % Default to forward reference
+    backward_idx = forward_idx;  
     for i = frame_idx+1:length(frame_types)
         if strcmp(frame_types{i}, 'I') || strcmp(frame_types{i}, 'P')
             backward_idx = i;
@@ -196,15 +191,12 @@ function [frame_data, reconstructed] = encode_i_frame(frame, Q_LUMA, Q_CHROMA, B
     
     for i = 1:mb_height
         for j = 1:mb_width
-            % Extract macroblock
             row_start = (i-1)*BLOCK_SIZE + 1;
             row_end = i*BLOCK_SIZE;
             col_start = (j-1)*BLOCK_SIZE + 1;
             col_end = j*BLOCK_SIZE;
             
             mb = frame(row_start:row_end, col_start:col_end, :);
-            
-            % Process each color channel
             mb_encoded = [];
             mb_reconstructed = zeros(BLOCK_SIZE, BLOCK_SIZE, channels);
             
@@ -216,19 +208,15 @@ function [frame_data, reconstructed] = encode_i_frame(frame, Q_LUMA, Q_CHROMA, B
                     Q_matrix = Q_CHROMA;
                 end
                 
-                % DCT transform
                 dct_block = dct2(mb(:,:,c));
                 
-                % Quantization
                 quantized = round(dct_block ./ Q_matrix);
                 
-                % Zigzag scan and RLE
                 zigzag_vector = zigzag_scan(quantized);
                 rle_data = run_length_encode(zigzag_vector);
                 
                 mb_encoded = [mb_encoded serialize_rle(rle_data)];
                 
-                % Reconstruction for prediction
                 dequantized = quantized .* Q_matrix;
                 mb_reconstructed(:,:,c) = idct2(dequantized);
             end
@@ -252,7 +240,6 @@ function [frame_data, reconstructed] = encode_p_frame(frame, ref_frame, Q_LUMA, 
     
     for i = 1:mb_height
         for j = 1:mb_width
-            % Extract macroblocks
             row_start = (i-1)*BLOCK_SIZE + 1;
             row_end = i*BLOCK_SIZE;
             col_start = (j-1)*BLOCK_SIZE + 1;
@@ -261,10 +248,10 @@ function [frame_data, reconstructed] = encode_p_frame(frame, ref_frame, Q_LUMA, 
             mb = frame(row_start:row_end, col_start:col_end, :);
             ref_mb = ref_frame(row_start:row_end, col_start:col_end, :);
             
-            % Compute residual
+            % residual computation
             residual = mb - ref_mb;
             
-            % Process each color channel
+            % Processing each color channel
             mb_encoded = [];
             mb_reconstructed = zeros(BLOCK_SIZE, BLOCK_SIZE, channels);
             
@@ -276,19 +263,13 @@ function [frame_data, reconstructed] = encode_p_frame(frame, ref_frame, Q_LUMA, 
                     Q_matrix = Q_CHROMA;
                 end
                 
-                % DCT transform of residual
-                dct_block = dct2(residual(:,:,c));
-                
-                % Quantization
+                dct_block = dct2(residual(:,:,c));                
                 quantized = round(dct_block ./ Q_matrix);
-                
-                % Zigzag scan and RLE
                 zigzag_vector = zigzag_scan(quantized);
                 rle_data = run_length_encode(zigzag_vector);
                 
                 mb_encoded = [mb_encoded serialize_rle(rle_data)];
                 
-                % Reconstruction
                 dequantized = quantized .* Q_matrix;
                 reconstructed_residual = idct2(dequantized);
                 mb_reconstructed(:,:,c) = ref_mb(:,:,c) + reconstructed_residual;
@@ -299,7 +280,7 @@ function [frame_data, reconstructed] = encode_p_frame(frame, ref_frame, Q_LUMA, 
         end
     end
     
-    % Clip reconstructed values
+
     reconstructed = max(0, min(255, reconstructed));
 end
 
@@ -313,7 +294,6 @@ function [frame_data, reconstructed] = encode_b_frame(frame, forward_ref, backwa
     
     for i = 1:mb_height
         for j = 1:mb_width
-            % Extract macroblocks
             row_start = (i-1)*BLOCK_SIZE + 1;
             row_end = i*BLOCK_SIZE;
             col_start = (j-1)*BLOCK_SIZE + 1;
@@ -323,37 +303,30 @@ function [frame_data, reconstructed] = encode_b_frame(frame, forward_ref, backwa
             forward_mb = forward_ref(row_start:row_end, col_start:col_end, :);
             backward_mb = backward_ref(row_start:row_end, col_start:col_end, :);
             
-            % Bidirectional prediction (simple average)
+
             predicted_mb = (forward_mb + backward_mb) / 2;
             
-            % Compute residual
             residual = mb - predicted_mb;
             
-            % Process each color channel
             mb_encoded = [];
             mb_reconstructed = zeros(BLOCK_SIZE, BLOCK_SIZE, channels);
             
             for c = 1:channels
-                % Select quantization matrix
                 if c == 1
                     Q_matrix = Q_LUMA;
                 else
                     Q_matrix = Q_CHROMA;
                 end
                 
-                % DCT transform of residual
                 dct_block = dct2(residual(:,:,c));
                 
-                % Quantization
                 quantized = round(dct_block ./ Q_matrix);
                 
-                % Zigzag scan and RLE
                 zigzag_vector = zigzag_scan(quantized);
                 rle_data = run_length_encode(zigzag_vector);
                 
                 mb_encoded = [mb_encoded serialize_rle(rle_data)];
                 
-                % Reconstruction
                 dequantized = quantized .* Q_matrix;
                 reconstructed_residual = idct2(dequantized);
                 mb_reconstructed(:,:,c) = predicted_mb(:,:,c) + reconstructed_residual;
@@ -364,13 +337,10 @@ function [frame_data, reconstructed] = encode_b_frame(frame, forward_ref, backwa
         end
     end
     
-    % Clip reconstructed values
     reconstructed = max(0, min(255, reconstructed));
 end
 
-% Helper functions
 function zigzag_vector = zigzag_scan(block)
-    % Zigzag scan order for 8x8 block
     zigzag_order = [1 2 6 7 15 16 28 29;
                     3 5 8 14 17 27 30 43;
                     4 9 13 18 26 31 42 44;
@@ -401,17 +371,15 @@ function rle_data = run_length_encode(vector)
     end
 end
 
+% Convert RLE data to byte stream
 function serialized = serialize_rle(rle_data)
-    % Convert RLE data to byte stream
     serialized = [];
     for i = 1:size(rle_data, 1)
         run_length = rle_data(i, 1);
         value = rle_data(i, 2);
         
-        % Store as: [run_length(1 byte), value(2 bytes signed)]
         serialized = [serialized uint8(run_length)];
         
-        % Convert value to signed 16-bit
         if value >= 0
             serialized = [serialized typecast(int16(value), 'uint8')];
         else
@@ -421,7 +389,6 @@ function serialized = serialize_rle(rle_data)
 end
 
 function serialized = serialize_frame_data(frame_data)
-    % Add frame data length header
     data_length = length(frame_data);
     serialized = [typecast(uint32(data_length), 'uint8') frame_data];
 end
