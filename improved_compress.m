@@ -1,9 +1,8 @@
-function improved_compress()
+function improved_compress(GOP_SIZE)
     % Improved Video Compression with B-frames and Enhanced Quantization
     % GOP Structure: I-B-B-P-B-B-P-... 
     
     % parameters which will be used.
-    GOP_SIZE = 15;  % Total frames in GOP (adjustable)
     BLOCK_SIZE = 8;
     
     % Enhanced quantization matrices

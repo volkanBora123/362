@@ -21,7 +21,7 @@ function improved_decompress()
                 99 99 99 99 99 99 99 99];
     %reading all info
     fid = fopen('result_improved.bin', 'rb');
-    if fid == -1
+    if fid == -11
         error('Cannot open compressed file: result_improved.bin');
     end
 
