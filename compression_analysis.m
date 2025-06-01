@@ -1,5 +1,3 @@
-global GOP_SIZE;
-
 gop_sizes = 1:30;
 compression_ratios_original = zeros(size(gop_sizes));
 compression_ratios_improved = zeros(size(gop_sizes));
@@ -18,8 +16,8 @@ for i = 1:length(gop_sizes)
     if isfile('result.bin')
         delete result.bin;
     end
-    compress;
-    if ~isfile('result.bin')
+    compress(GOP_SIZE);
+    if ~isfile('result.bin')    
         error('result.bin not found after compress');
     end
     original_size = dir('result.bin').bytes;
@@ -37,18 +35,30 @@ for i = 1:length(gop_sizes)
     compression_ratios_improved(i) = uncompressed_size_bits / (8 * improved_size);
 end
 
-% --- Plotting the results ---
+% --- Plotting Original Compression Ratio ---
 figure;
-plot(gop_sizes, compression_ratios_original, 'b-o', 'LineWidth', 2); hold on;
-plot(gop_sizes, compression_ratios_improved, 'r-s', 'LineWidth', 2);
+plot(gop_sizes, compression_ratios_original, 'b-o', 'LineWidth', 2);
 xlabel('GOP Size');
 ylabel('Compression Ratio');
-title('Compression Ratio vs GOP Size');
-legend('Original', 'Improved', 'Location', 'northwest');
+title('Original Compression Ratio vs GOP Size');
 grid on;
 set(gca, 'FontSize', 12);
 
-% Save plot
-saveas(gcf, 'compression_ratio_plot.png');
+% Save Original plot
+saveas(gcf, 'compression_ratio_original.png');
 
-fprintf('✅ Compression analysis complete. Plot saved as compression_ratio_plot.png\n');
+% --- Plotting Improved Compression Ratio ---
+figure;
+plot(gop_sizes, compression_ratios_improved, 'r-s', 'LineWidth', 2);
+xlabel('GOP Size');
+ylabel('Compression Ratio');
+title('Improved Compression Ratio vs GOP Size');
+grid on;
+set(gca, 'FontSize', 12);
+
+% Save Improved plot
+saveas(gcf, 'compression_ratio_improved.png');
+
+fprintf('Compression analysis complete. Plots saved as:\n');
+fprintf('   - compression_ratio_original.png\n');
+fprintf('   - compression_ratio_improved.png\n');

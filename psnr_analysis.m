@@ -1,8 +1,6 @@
 % psnr_analysis.m
 % Analyze PSNR vs Frame Number for different GOP sizes
 
-global GOP_SIZE;
-
 % Define GOP sizes to test
 gop_sizes = [1, 15, 30];
 num_frames = 120;
@@ -21,19 +19,19 @@ for gop_idx = 1:length(gop_sizes)
     fprintf('\nProcessing GOP size = %d\n', GOP_SIZE);
 
     % Compress and decompress
-    compress;
-    decompress;
+    improved_compress(GOP_SIZE); % Change this to compress(GOP_SIZE); for Part 1
+    improved_decompress(); % Change this to decompress(GOP_SIZE); for Part 1
 
     for frame = 1:num_frames
         % --- ORIGINAL FRAME ---
-        orig_path = sprintf('./video_data/frame%03d.jpg', frame);
+        orig_path = sprintf('./video_data/frame%03d.jpg', frame); 
         if ~isfile(orig_path)
             error('Original frame %03d not found at %s', frame, orig_path);
         end
         orig_frame = imread(orig_path);
 
         % --- RECONSTRUCTED FRAME ---
-        recon_path = sprintf('./decompressed/frame%03d.jpg', frame);
+        recon_path = sprintf('./decompressed_frames/frame_%04d.jpg', frame); % Change this to './decompressed/ and frame%03d.jpg for Part 1
         if ~isfile(recon_path)
             error('Reconstructed frame %03d not found at %s', frame, recon_path);
         end
@@ -49,7 +47,7 @@ for gop_idx = 1:length(gop_sizes)
 
         % Show progress
         if mod(frame, 10) == 0
-            fprintf('Frame %03d/120 processed\n', frame);
+            fprintf('Frame %04d/120 processed\n', frame); % Change to %03d/120 for Part 1
         end
     end
 end
@@ -66,13 +64,13 @@ end
 
 xlabel('Frame Number');
 ylabel('PSNR (dB)');
-title('PSNR vs Frame Number for Different GOP Sizes');
+title('PSNR vs Frame Number for Different GOP Sizes for Improved Algorithm');
 legend('Location', 'best');
 grid on;
 set(gca, 'FontSize', 12);
-saveas(gcf, 'psnr_plot.png');
+saveas(gcf, 'psnr_plot_improved.png'); % Change this to psnr_plot.png for Part 1
 
-fprintf('\n✅ PSNR analysis complete. Plot saved as psnr_plot.png\n');
+fprintf('\n✅ PSNR analysis complete. Plot saved as psnr_plot_improved.png\n');
 
 % --- AVERAGE PSNR ---
 fprintf('\nAverage PSNR per GOP:\n');

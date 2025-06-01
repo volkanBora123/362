@@ -95,8 +95,6 @@ function [decoded_frames, new_pos] = decode_gop_with_b_frames(bitstream, pos, go
         frame_type_marker = char(bitstream(current_pos));
         current_pos = current_pos + 1;
         expected_marker = frame_types{i};
-        fprintf('    Position %d: Read marker ''%s'' (ASCII %d), Expected: ''%s''\n', ...
-            current_pos-1, frame_type_marker, double(bitstream(current_pos-1)), expected_marker);
         if frame_type_marker ~= expected_marker
             error('Mismatch in expected frame type at position %d. Expected: %s, Found: %s (ASCII: %d)', ...
                 i, expected_marker, frame_type_marker, double(bitstream(current_pos-1)));
@@ -105,7 +103,6 @@ function [decoded_frames, new_pos] = decode_gop_with_b_frames(bitstream, pos, go
         fprintf('  Frame %d, type %s, start pos: %d\n', i, frame_type_marker, current_pos-1);
 
         if strcmp(frame_type_marker, 'I') || strcmp(frame_type_marker, 'P')
-            fprintf('  Decoding %s-frame %d\n', frame_type_marker, i);
             if frame_type_marker == 'I'
                 [decoded_frames{i}, current_pos] = decode_i_frame(...
                     bitstream, current_pos, Q_LUMA, Q_CHROMA, BLOCK_SIZE, height, width);
@@ -149,7 +146,7 @@ function [decoded_frames, new_pos] = decode_gop_with_b_frames(bitstream, pos, go
                     current_pos-1, expected_marker, frame_type_marker, double(bitstream(current_pos-1)));
             end
 
-            fprintf('  Decoding B-frame %d, start pos: %d\n', i, current_pos-1);
+            fprintf('  Decoding B-frame %d', i);
             [forward_idx, backward_idx] = find_b_frame_references(i, frame_types);
             if ~decoded_flags(forward_idx) || ~decoded_flags(backward_idx)
                 error('Reference frame(s) for B-frame %d are missing. F: %d, B: %d', ...
@@ -214,7 +211,6 @@ function [frame, new_pos] = decode_i_frame(bitstream, pos, Q_LUMA, Q_CHROMA, BLO
     end
     data_length = double(typecast(uint8(bitstream(pos:pos+3)), 'uint32'));
     pos = pos + 4;
-    fprintf('    I-frame data length: %d bytes\n', data_length);
     if pos + data_length - 1 > length(bitstream)
         error('Not enough data for I-frame. Need %d bytes, have %d available', ...
             data_length, length(bitstream) - pos + 1);
@@ -267,7 +263,6 @@ function [frame, new_pos] = decode_p_frame(bitstream, pos, ref_frame, Q_LUMA, Q_
     end
     data_length = double(typecast(uint8(bitstream(pos:pos+3)), 'uint32'));
     pos = pos + 4;
-    fprintf('    P-frame data length: %d bytes\n', data_length);
     channels = 3;
     frame = zeros(height, width, channels);
     mb_height = ceil(height / BLOCK_SIZE);
@@ -313,7 +308,6 @@ function [frame, new_pos] = decode_b_frame(bitstream, pos, forward_ref, backward
     end
     data_length = double(typecast(uint8(bitstream(pos:pos+3)), 'uint32'));
     pos = pos + 4;
-    fprintf('    B-frame data length: %d bytes\n', data_length);
     channels = 3;
     frame = zeros(height, width, channels);
     mb_height = ceil(height / BLOCK_SIZE);

@@ -1,6 +1,4 @@
-function compress()
-    global GOP_SIZE;
-    
+function compress(GOP_SIZE)
     % Reading  the inputs
     video_path = './video_data/';
     frame_files = dir(fullfile(video_path, '*.jpg'));

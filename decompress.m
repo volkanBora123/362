@@ -1,6 +1,4 @@
-function decompress()
-
-    GOP_SIZE = 30;
+function decompress(GOP_SIZE)
     % Load compressed binary data
     compressed_data = deserialize_from_binary('result.bin');
     
